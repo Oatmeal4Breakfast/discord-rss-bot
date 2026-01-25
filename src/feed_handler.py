@@ -1,6 +1,6 @@
 import feedparser
 from feedparser import FeedParserDict
-from models import Entry
+from src.models import Entry
 
 
 def fetch_feed_entries(url: str, max_items: int = 5) -> list[Entry]:
@@ -28,3 +28,4 @@ def fetch_feed_entries(url: str, max_items: int = 5) -> list[Entry]:
 if __name__ == "__main__":
     entries = fetch_feed_entries(url="https://www.reddit.com/r/FastAPI/.rss")
     print(entries)
+    print(len(entries))
