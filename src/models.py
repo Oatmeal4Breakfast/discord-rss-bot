@@ -1,4 +1,8 @@
 from dataclasses import dataclass
+from typing import List, Dict
+
+
+type FeedEntries = List[Dict[str, str]]
 
 
 @dataclass
