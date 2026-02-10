@@ -1,12 +1,26 @@
+import json
 from html2text import HTML2Text
+from pathlib import Path
 
-from src.models import Config, FeedEntries
+from src.config import Config, config
+from src.feed_handler import FeedData, FeedHandler, Feed, Entry
 
 
 class DiscordBot:
     def __init__(self, config: Config, parser: HTML2Text) -> None:
         self.config: Config = config
         self.parser: HTML2Text = parser
+        self.sent_items: list[dict[str, str]] = self._load_sent_items()
+        
+    def _load_sent_items(self) -> None:
+        """
+        loads the json for the sent entries
+        """
+        sent_items: Path = Path.cwd() / "sent_items.json"
+        with open(file=sent_items, mode="r") as file:
+            sent_items = json.load(file)
+            self.sent_items.append(sent_items)
+
 
     def _parse_html(self, description_html: str) -> str:
         """
@@ -15,10 +29,9 @@ class DiscordBot:
         return self.parser.handle(data=description_html)
 
     def _validate_entries(self, entries: FeedEntries) -> FeedEntries:
-        # TODO: figure out the storage for the sent items. SQLITE? JSON?
         valid_entries: FeedEntries = []
         for entry in entries:
-            if entry not in sent_list:
+            if entry not in self.sent_items:
                 valid_entries.append(entry)
         return valid_entries
 
