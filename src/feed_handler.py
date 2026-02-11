@@ -1,10 +1,13 @@
 import feedparser
 import yaml
+import uuid
+
 from pathlib import Path
 from feedparser import FeedParserDict
 from dataclasses import dataclass
 
-FEEDS_PATH: Path | str = Path.cwd() / "feeds.yaml"
+from src.config import Config
+
 
 type FeedData = list[dict[str, str]]
 
@@ -18,6 +21,7 @@ class Feed:
 
 @dataclass
 class Entry:
+    id: str
     title: str
     link: str
     published: str
@@ -25,13 +29,14 @@ class Entry:
 
 
 class FeedHandler:
-    def __init__(self, feeds_file: Path | str = FEEDS_PATH) -> None:
-        self.feeds_file: Path | str = feeds_file
+    def __init__(self, config: Config) -> None:
+        self.feeds_file: Path = Path.cwd() / f"{config.feed_file}"
         self.feeds: list[Feed] = []
 
     def _load_feeds(self) -> FeedData:
-        """
-        returns yaml object from the feeds file
+        """Loads feeds from feed_file
+        Returns:
+            yaml object from the feeds file
         """
         try:
             with open(file=self.feeds_file, mode="r") as file:
@@ -41,9 +46,12 @@ class FeedHandler:
             raise
 
     def extract_feeds(self) -> None:
+        """creates a data structure for the list to work with later
+
+        Raises:
+            RuntimeError if there is no feeds.yaml file
         """
-        creates a data structure for the list to work with later
-        """
+
         data: FeedData = self._load_feeds()
         for item in data:
             values: list[str] = [value for value in item.values()]
@@ -59,17 +67,21 @@ class FeedHandler:
         if not len(self.feeds) >= 0:
             raise RuntimeError("No feeds found in feeds.yaml")
 
-    def fetch_feed_entries(self, feed_url: str, max_items: int = 5) -> list[Entry]:
-        """
-        Fetch entries from the feed up to the max items set in the config.
-        Defaults to 5
+    def fetch_feed_entries(self, feed_url: str, max_entries: int = 5) -> list[Entry]:
+        """Fetch entries from the feed up to the mac items in the config
 
-        Returns a list of entries
+        Args:
+            feed_url: str - url of the feed
+            max_entries: int - max number of entries you would like. Defaults to 5
+
+        Returns:
+            list[Entry]
         """
         feed: FeedParserDict = feedparser.parse(url_file_stream_or_string=feed_url)
         entries: list[Entry] = []
-        for entry in feed.entries[:max_items]:
+        for entry in feed.entries[:max_entries]:
             new_entry: Entry = Entry(
+                id=str(uuid.uuid4()),
                 title=entry.title,
                 link=entry.link,
                 published=entry.published,
@@ -82,9 +94,12 @@ class FeedHandler:
 
 
 if __name__ == "__main__":
-    handler: FeedHandler = FeedHandler()
+    from src.config import config
+    from dataclasses import asdict
+
+    handler: FeedHandler = FeedHandler(config=config)
     entries: list[Entry] = handler.fetch_feed_entries(
         feed_url="https://www.reddit.com/r/FastAPI/.rss"
     )
-    print(entries[0])
+    print(asdict(entries[0]))
     print(len(entries))
