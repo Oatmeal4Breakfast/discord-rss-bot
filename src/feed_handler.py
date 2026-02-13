@@ -9,9 +9,6 @@ from dataclasses import dataclass
 from src.config import Config
 
 
-type FeedData = list[dict[str, str]]
-
-
 @dataclass
 class Feed:
     name: str
@@ -22,16 +19,20 @@ class Feed:
 @dataclass
 class Entry:
     id: str
+    feed: str
     title: str
     link: str
     published: str
     summary: str
 
 
+type FeedData = dict[str, list[dict[str, str]]]
+
+
 class FeedHandler:
     def __init__(self, config: Config) -> None:
         self.feeds_file: Path = Path.cwd() / f"{config.feed_file}"
-        self.feeds: list[Feed] = []
+        self.feeds: list[Feed] = self._extract_feeds()
 
     def _load_feeds(self) -> FeedData:
         """Loads feeds from feed_file
@@ -43,32 +44,34 @@ class FeedHandler:
                 data: list[dict[str, str]] = yaml.safe_load(stream=file)
                 return data
         except FileNotFoundError:
-            raise
+            raise RuntimeError("Unable to locate feeds.yaml file")
 
-    def extract_feeds(self) -> None:
+    def _extract_feeds(self) -> list[Feed]:
         """creates a data structure for the list to work with later
 
         Raises:
             RuntimeError if there is no feeds.yaml file
         """
-
         data: FeedData = self._load_feeds()
-        for item in data:
-            values: list[str] = [value for value in item.values()]
-            if None in values:
+        feeds: list[Feed] = []
+        for item in data["feeds"]:
+            name: str = item.get("name", "")
+            url: str = item.get("url", "")
+            webhook: str = item.get("webhook", "")
+
+            if any(not s for s in [name, url, webhook]):
                 print("Log: incomplete Feed object")
                 continue
-            feed: Feed = Feed(
-                name=item.get("name", ""),
-                url=item.get("url", ""),
-                webhook=item.get("webhook", ""),
-            )
-            self.feeds.append(feed)
-        if not len(self.feeds) >= 0:
-            raise RuntimeError("No feeds found in feeds.yaml")
 
-    def fetch_feed_entries(self, feed_url: str, max_entries: int = 5) -> list[Entry]:
-        """Fetch entries from the feed up to the mac items in the config
+            feed: Feed = Feed(name=name, url=url, webhook=webhook)
+            feeds.append(feed)
+
+        if not feeds:
+            raise RuntimeError("No feeds found in feeds.yaml")
+        return feeds
+
+    def fetch_feed_entries(self, feed: Feed, max_entries: int = 5) -> list[Entry]:
+        """Fetch entries from the feed up to the max items in the config
 
         Args:
             feed_url: str - url of the feed
@@ -77,18 +80,21 @@ class FeedHandler:
         Returns:
             list[Entry]
         """
-        feed: FeedParserDict = feedparser.parse(url_file_stream_or_string=feed_url)
+        parsed_feed: FeedParserDict = feedparser.parse(
+            url_file_stream_or_string=feed.url
+        )
         entries: list[Entry] = []
-        for entry in feed.entries[:max_entries]:
+        for entry in parsed_feed.entries[:max_entries]:
             new_entry: Entry = Entry(
                 id=str(uuid.uuid4()),
+                feed=feed.name,
                 title=entry.title,
                 link=entry.link,
                 published=entry.published,
                 summary=entry.summary if "summary" in entry else "",
             )
             entries.append(new_entry)
-        if feed.bozo:
+        if parsed_feed.bozo:
             return []
         return entries
 
@@ -98,8 +104,6 @@ if __name__ == "__main__":
     from dataclasses import asdict
 
     handler: FeedHandler = FeedHandler(config=config)
-    entries: list[Entry] = handler.fetch_feed_entries(
-        feed_url="https://www.reddit.com/r/FastAPI/.rss"
-    )
+    entries: list[Entry] = handler.fetch_feed_entries(feed=handler.feeds[0])
     print(asdict(entries[0]))
     print(len(entries))
