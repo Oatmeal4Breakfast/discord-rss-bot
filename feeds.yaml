@@ -5,7 +5,7 @@ feeds:
   - name: "TechCrunch"
     url: "https://techcrunch.com/feed/"
     webhook: "https://discord.com/api/webhooks/1402326018953314355/T7RzwzpY1yb0Pg26o1zBlQGYs-SHpgLKSARYnNgsZv4Rb9XQ3sx7d3DKwxS7rYrbpTuI"
-    keywords:
+
   - name: "Bleeping Computer"
     url: "https://www.bleepingcomputer.com/feed/"
     webhook: "https://discord.com/api/webhooks/1402326018953314355/T7RzwzpY1yb0Pg26o1zBlQGYs-SHpgLKSARYnNgsZv4Rb9XQ3sx7d3DKwxS7rYrbpTuI"
