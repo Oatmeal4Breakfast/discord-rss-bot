@@ -22,7 +22,6 @@ class Entry:
     feed: str
     title: str
     link: str
-    published: str
     summary: str
 
 
@@ -32,7 +31,6 @@ type FeedData = dict[str, list[dict[str, str]]]
 class FeedHandler:
     def __init__(self, config: Config) -> None:
         self.feeds_file: Path = Path.cwd() / f"{config.feed_file}"
-        self.feeds: list[Feed] = self._extract_feeds()
 
     def _load_feeds(self) -> FeedData:
         """Loads feeds from feed_file
@@ -46,7 +44,7 @@ class FeedHandler:
         except FileNotFoundError:
             raise RuntimeError("Unable to locate feeds.yaml file")
 
-    def _extract_feeds(self) -> list[Feed]:
+    def extract_feeds(self) -> list[Feed]:
         """creates a data structure for the list to work with later
 
         Raises:
@@ -90,7 +88,6 @@ class FeedHandler:
                 feed=feed.name,
                 title=entry.title,
                 link=entry.link,
-                published=entry.published,
                 summary=entry.summary if "summary" in entry else "",
             )
             entries.append(new_entry)
@@ -104,6 +101,7 @@ if __name__ == "__main__":
     from dataclasses import asdict
 
     handler: FeedHandler = FeedHandler(config=config)
-    entries: list[Entry] = handler.fetch_feed_entries(feed=handler.feeds[0])
+    feeds: list[Feed] = handler.extract_feeds()
+    entries: list[Entry] = handler.fetch_feed_entries(feed=feeds[0])
     print(asdict(entries[0]))
     print(len(entries))

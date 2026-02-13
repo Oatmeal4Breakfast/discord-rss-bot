@@ -2,15 +2,15 @@ import json
 import httpx
 from html2text import HTML2Text
 from pathlib import Path
-from dataclasses import asdict
+from collections import defaultdict
 
 from src.config import Config
-from src.feed_handler import FeedData, FeedHandler, Feed, Entry
+from src.feed_handler import Feed, Entry
 
 
-# TODO: Work out the logic for processing
-
-# TODO: Complete the send patch implementation
+# TODO: review send_batch method
+# TODO: Implement logging
+# TODO: Complete the test suite
 
 
 class DiscordBot:
@@ -73,7 +73,7 @@ class DiscordBot:
         Returns:
             str
         """
-        return self.parser.handle(data=entry.summary)
+        return self.parser.handle(data=entry.summary).strip()[:2048]
 
     def _filter_entries(self, entries: list[Entry]):
         """check the entry id against the list of sent entries
@@ -90,7 +90,38 @@ class DiscordBot:
                 unsent_entries.append(entry)
         return unsent_entries
 
-    async def send_batch(self, entries: list[Entry]) -> None:
+    def _process_entries(self, entries: list[Entry]) -> list[dict[str, str]]:
+        payloads: list[dict[str, str]] = []
+        for entry in entries:
+            payload: dict[str, str] = {
+                "title": entry.title,
+                "link": entry.link,
+                "description": self._parse_entry_summary(entry),
+            }
+            payloads.append(payload)
+        return payloads
+
+    def _webhook_lookup(
+        self, entries: list[Entry], feeds: list[Feed]
+    ) -> dict[str, list[Entry]]:
+        """Map entries to their feed webhook_url
+
+        Args:
+            entries - list of Entry objects
+            feeds - list of Feed objects
+
+        Returns:
+            a dictionary that maps the webhook_url to the entries
+        """
+        feed_map: dict[str, str] = {feed.name: feed.webhook for feed in feeds}
+        results: dict[str, list[Entry]] = defaultdict(list)
+        for entry in entries:
+            webhook: str = feed_map.get(entry.feed, "")
+            if webhook:
+                results[webhook].append(entry)
+        return dict(results)
+
+    async def send_batch(self, entries: list[Entry], feeds: list[Feed]) -> None:
         """send the batch of entries from the feed
 
         Args:
@@ -100,6 +131,16 @@ class DiscordBot:
             None
         """
         valid_entries: list[Entry] = self._filter_entries(entries)
-        for entry in valid_entries:
+        batches: dict[str, list[Entry]] = self._webhook_lookup(
+            entries=valid_entries, feeds=feeds
+        )
+        for webhook_url, entry_list in batches.items():
+            payloads = self._process_entries(entry_list)
             async with httpx.AsyncClient() as client:
-                raise NotImplementedError
+                response: httpx.Response = await client.post(
+                    url=webhook_url, json={"embeds": payloads}
+                )
+                if response.status_code == 429:
+                    print("log something here")
+                if response == 200:
+                    print("log something else here")
