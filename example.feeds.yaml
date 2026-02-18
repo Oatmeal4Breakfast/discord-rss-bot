@@ -1,0 +1,19 @@
+feeds:
+  #------------------------------------------------------------------
+  # Tech News Feeds
+  #------------------------------------------------------------------''
+  - name: "TechCrunch"
+    url: "https://techcrunch.com/feed/"
+    webhook: ""
+
+  - name: "Bleeping Computer"
+    url: "https://www.bleepingcomputer.com/feed/"
+    webhook: ""
+
+  - name: "The Verge"
+    url: "http://theverge.com/rss/index.html"
+    webhook: ""
+
+  - name: "The Medium - Engineering"
+    url: "https://medium.com/feed/medium-eng"
+    webhook: ""
