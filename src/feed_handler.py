@@ -97,9 +97,10 @@ class FeedHandler:
 
 
 if __name__ == "__main__":
-    from src.config import config
+    from src.config import get_config
     from dataclasses import asdict
 
+    config = get_config()
     handler: FeedHandler = FeedHandler(config=config)
     feeds: list[Feed] = handler.extract_feeds()
     entries: list[Entry] = handler.fetch_feed_entries(feed=feeds[0])

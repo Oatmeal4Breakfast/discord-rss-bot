@@ -13,3 +13,8 @@ wheels/
 # environment variables
 .env
 .env.*
+
+
+*.log
+
+feeds.yaml

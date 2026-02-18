@@ -15,12 +15,12 @@ from src.logger import get_logger
 
 
 class DiscordBot:
-    def __init__(self, config: Config, parser: HTML2Text) -> None:
+    def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.parser: HTML2Text = parser
-        self.sent_items: dict[str, list[str]] = self._load_sent_items()
+        self.parser: HTML2Text = HTML2Text()
         self.path: Path = Path.cwd() / f"{config.sent_file}"
         self.logger = get_logger(__name__, config)
+        self.sent_items: dict[str, list[str]] = self._load_sent_items()
 
     def _load_sent_items(self) -> dict[str, list[str]]:
         """Creates a sent_items.json to store sent entries
@@ -96,7 +96,11 @@ class DiscordBot:
         """
         unsent_entries: list[Entry] = []
         for entry in entries:
-            if entry.id not in self.sent_items[entry.feed]:
+            sent_entries: list[str] | None = self.sent_items.get(entry.feed)
+            if not sent_entries:
+                self.logger.info(f"No sent entries for feed: {entry.feed} found...")
+                unsent_entries.append(entry)
+            elif entry.id not in sent_entries:
                 self.logger.info(f"found unsent entry {entry.id}")
                 unsent_entries.append(entry)
         return unsent_entries
@@ -154,6 +158,7 @@ class DiscordBot:
                         url=webhook_url, json={"embeds": payloads}
                     )
                     response.raise_for_status()
+
                 except httpx.HTTPStatusError as exec:
                     self.logger.warn(
                         f"Error {exec.response.status_code} when making the request"
