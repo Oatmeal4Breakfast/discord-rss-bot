@@ -9,8 +9,9 @@ from src.feed_handler import Feed, Entry
 from src.logger import get_logger
 
 
+# TODO: Implement retry logic
+# TODO: Fix/Implement the adding and saving methods to the batch_send method
 # TODO: review send_batch method
-# TODO: Implement logging
 # TODO: Complete the test suite
 
 
@@ -111,7 +112,7 @@ class DiscordBot:
             self.logger.info(f"Processing {entry.id}...")
             payload: dict[str, str] = {
                 "title": entry.title,
-                "link": entry.link,
+                "url": entry.link,
                 "description": self._parse_entry_summary(entry),
             }
             payloads.append(payload)
@@ -152,14 +153,12 @@ class DiscordBot:
         )
         for webhook_url, entry_list in batches.items():
             payloads = self._process_entries(entry_list)
-            async with httpx.AsyncClient() as client:
-                try:
+            for payload in payloads:
+                async with httpx.AsyncClient() as client:
                     response: httpx.Response = await client.post(
-                        url=webhook_url, json={"embeds": payloads}
+                        url=webhook_url, json={"embeds": [payload]}
                     )
-                    response.raise_for_status()
-
-                except httpx.HTTPStatusError as exec:
-                    self.logger.warn(
-                        f"Error {exec.response.status_code} when making the request"
-                    )
+                    if response.status_code != 200:
+                        self.logger.error(
+                            f"response code: {response.status_code}\nresponse message: {response.text}\n response headers: {response.headers}\n"
+                        )

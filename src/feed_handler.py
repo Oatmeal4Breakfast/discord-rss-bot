@@ -68,7 +68,7 @@ class FeedHandler:
             raise RuntimeError("No feeds found in feeds.yaml")
         return feeds
 
-    def fetch_feed_entries(self, feed: Feed, max_entries: int = 5) -> list[Entry]:
+    def fetch_feed_entries(self, feed: Feed, max_entries: int = 3) -> list[Entry]:
         """Fetch entries from the feed up to the max items in the config
 
         Args:
