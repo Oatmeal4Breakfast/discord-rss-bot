@@ -48,7 +48,7 @@ class DiscordBot:
             None
         """
         self.logger.info(f"added {entry.feed} to {self.config.sent_file}.")
-        return self.sent_items[entry.feed].append(entry.id)
+        return self.sent_items.setdefault(entry.feed, []).append(entry.id)
 
     def _parse_entry_summary(self, entry: Entry) -> str:
         """Parse the html in the description of the entry to send plain ASCII strings to Discord
@@ -114,9 +114,7 @@ class DiscordBot:
                 results[webhook].append(entry)
         return dict(results)
 
-    async def _send_with_retry(
-        self, webhook_url: str, payload: dict[str, str], retry_limit: int = 3
-    ) -> int:
+    async def _send_with_retry(self, webhook_url: str, payload: dict[str, str]) -> int:
         """send with retry implementation
 
         Args:
@@ -128,7 +126,7 @@ class DiscordBot:
         """
         retry_count: int = 0
         async with httpx.AsyncClient() as client:
-            while retry_count < retry_limit:
+            while retry_count < self.config.retry_count:
                 response: httpx.Response = await client.post(
                     url=webhook_url, json={"embeds": [payload]}
                 )
@@ -138,7 +136,9 @@ class DiscordBot:
                         f"Too many requests at once please wait {retry_after / 1000} seconds..."
                     )
                     await asyncio.sleep(retry_after / 1000)
-                    retry_count += 1
+                else:
+                    break
+                retry_count += 1
 
             self.logger.info(f"[{response.status_code}] - [{response.text}]")
             return response.status_code
@@ -183,6 +183,5 @@ class DiscordBot:
             payloads = self._process_entries(entry_list)
             for entry, payload in zip(entry_list, payloads):
                 response_status: int = await self._send_with_retry(webhook_url, payload)
-
                 if response_status < 300:
                     self._add_sent_entry(entry)

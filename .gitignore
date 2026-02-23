@@ -18,3 +18,4 @@ wheels/
 *.log
 
 feeds.yaml
+sent_file.json
