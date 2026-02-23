@@ -11,9 +11,9 @@ async def main() -> None:
 
     feeds: list[Feed] = feed_handler.extract_feeds()
 
-    for feed in feeds:
-        entries: list[Entry] = feed_handler.fetch_feed_entries(feed)
-        await bot.send_batch(entries, feeds)
+    entries: list[Entry] = [feed_handler.fetch_feed_entries(feed) for feed in feeds]
+
+    await bot.send_batch(entries, feeds)
 
     bot.prune_sent_entries()
     bot.save_sent_entries()
