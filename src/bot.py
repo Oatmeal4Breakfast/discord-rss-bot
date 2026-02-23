@@ -1,4 +1,5 @@
 import json
+import asyncio
 import httpx
 from html2text import HTML2Text
 from pathlib import Path
@@ -9,7 +10,6 @@ from src.feed_handler import Feed, Entry
 from src.logger import get_logger
 
 
-# TODO: Implement retry logic
 # TODO: Fix/Implement the adding and saving methods to the batch_send method
 # TODO: review send_batch method
 # TODO: Complete the test suite
@@ -118,6 +118,34 @@ class DiscordBot:
             payloads.append(payload)
         return payloads
 
+    async def _send_with_retry(
+        self, webhook_url: str, payload: dict[str, str], retry_limit: int = 3
+    ) -> None:
+        """send with retry implementation
+
+        Args:
+            webhook_url - url to send the payload Too
+            payload - dictionary of the embed to send
+
+        Returns:
+            None
+        """
+        retry_count: int = 0
+        while retry_count < retry_limit:
+            async with httpx.AsyncClient() as client:
+                response: httpx.Response = await client.post(
+                    url=webhook_url, json={"embeds": [payload]}
+                )
+                if response.status_code == 429:
+                    retry_after = response.headers.get("retry_after", 0)
+                    self.logger.error(
+                        f"Too many requests at once please wait {retry_after / 1000} seconds..."
+                    )
+                    await asyncio.sleep(retry_after / 1000)
+                    retry_count += 1
+
+                self.logger.info(f"[{response.status_code}] - [{response.text}]")
+
     def _webhook_lookup(
         self, entries: list[Entry], feeds: list[Feed]
     ) -> dict[str, list[Entry]]:
@@ -154,11 +182,4 @@ class DiscordBot:
         for webhook_url, entry_list in batches.items():
             payloads = self._process_entries(entry_list)
             for payload in payloads:
-                async with httpx.AsyncClient() as client:
-                    response: httpx.Response = await client.post(
-                        url=webhook_url, json={"embeds": [payload]}
-                    )
-                    if response.status_code != 200:
-                        self.logger.error(
-                            f"response code: {response.status_code}\nresponse message: {response.text}\n response headers: {response.headers}\n"
-                        )
+                await self._send_with_retry(webhook_url, payload)
