@@ -1,6 +1,6 @@
+import hashlib
 import feedparser
 import yaml
-import uuid
 
 from pathlib import Path
 from feedparser import FeedParserDict
@@ -81,18 +81,21 @@ class FeedHandler:
         parsed_feed: FeedParserDict = feedparser.parse(
             url_file_stream_or_string=feed.url
         )
+        if parsed_feed.bozo:
+            return []
         entries: list[Entry] = []
         for entry in parsed_feed.entries[:max_entries]:
+            id: str = (
+                entry.id if entry.id else hashlib.sha256(data=entry.link).hexdigest()
+            )
             new_entry: Entry = Entry(
-                id=str(uuid.uuid4()),
+                id=id,
                 feed=feed.name,
                 title=entry.title,
                 link=entry.link,
                 summary=entry.summary if "summary" in entry else "",
             )
             entries.append(new_entry)
-        if parsed_feed.bozo:
-            return []
         return entries
 
 

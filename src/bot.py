@@ -11,7 +11,6 @@ from src.logger import get_logger
 
 
 # TODO: Fix/Implement the adding and saving methods to the batch_send method
-# TODO: review send_batch method
 # TODO: Complete the test suite
 
 
