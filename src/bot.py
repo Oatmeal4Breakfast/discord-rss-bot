@@ -50,29 +50,6 @@ class DiscordBot:
         self.logger.info(f"added {entry.feed} to {self.config.sent_file}.")
         return self.sent_items[entry.feed].append(entry.id)
 
-    def _save_sent_entry(self) -> None:
-        """saves the sent entries to the file json in the path attribute"""
-        try:
-            with open(file=self.path, mode="w") as file:
-                json.dump(self.sent_items, fp=file, indent=4)
-            self.logger.info(f"successfully saved to {self.config.sent_file}")
-        except IOError as e:
-            self.logger.error(
-                f"IOError occured when saving to {self.config.sent_file}: {e}"
-            )
-        except PermissionError as e:
-            self.logger.error(
-                f"PermissionError occured when saving to {self.config.sent_file}: {e}"
-            )
-
-    def _prune_sent_entries(self) -> None:
-        """Prune the first 10 entries from the list of sent entries"""
-        MAX_BEFORE_PRUNE: int = 100
-        PRUNE_AMOUNT: int = 10
-        for feed, sent_items in self.sent_items.items():
-            if len(sent_items) >= MAX_BEFORE_PRUNE:
-                del sent_items[:PRUNE_AMOUNT]
-
     def _parse_entry_summary(self, entry: Entry) -> str:
         """Parse the html in the description of the entry to send plain ASCII strings to Discord
 
@@ -117,34 +94,6 @@ class DiscordBot:
             payloads.append(payload)
         return payloads
 
-    async def _send_with_retry(
-        self, webhook_url: str, payload: dict[str, str], retry_limit: int = 3
-    ) -> None:
-        """send with retry implementation
-
-        Args:
-            webhook_url - url to send the payload Too
-            payload - dictionary of the embed to send
-
-        Returns:
-            None
-        """
-        retry_count: int = 0
-        while retry_count < retry_limit:
-            async with httpx.AsyncClient() as client:
-                response: httpx.Response = await client.post(
-                    url=webhook_url, json={"embeds": [payload]}
-                )
-                if response.status_code == 429:
-                    retry_after = response.headers.get("retry_after", 0)
-                    self.logger.error(
-                        f"Too many requests at once please wait {retry_after / 1000} seconds..."
-                    )
-                    await asyncio.sleep(retry_after / 1000)
-                    retry_count += 1
-
-                self.logger.info(f"[{response.status_code}] - [{response.text}]")
-
     def _webhook_lookup(
         self, entries: list[Entry], feeds: list[Feed]
     ) -> dict[str, list[Entry]]:
@@ -165,6 +114,58 @@ class DiscordBot:
                 results[webhook].append(entry)
         return dict(results)
 
+    async def _send_with_retry(
+        self, webhook_url: str, payload: dict[str, str], retry_limit: int = 3
+    ) -> int:
+        """send with retry implementation
+
+        Args:
+            webhook_url - url to send the payload Too
+            payload - dictionary of the embed to send
+
+        Returns:
+            status_code
+        """
+        retry_count: int = 0
+        async with httpx.AsyncClient() as client:
+            while retry_count < retry_limit:
+                response: httpx.Response = await client.post(
+                    url=webhook_url, json={"embeds": [payload]}
+                )
+                if response.status_code == 429:
+                    retry_after = response.headers.get("retry_after", 0)
+                    self.logger.error(
+                        f"Too many requests at once please wait {retry_after / 1000} seconds..."
+                    )
+                    await asyncio.sleep(retry_after / 1000)
+                    retry_count += 1
+
+            self.logger.info(f"[{response.status_code}] - [{response.text}]")
+            return response.status_code
+
+    def prune_sent_entries(self) -> None:
+        """Prune the first 10 entries from the list of sent entries"""
+        MAX_BEFORE_PRUNE: int = 100
+        PRUNE_AMOUNT: int = 10
+        for feed, sent_items in self.sent_items.items():
+            if len(sent_items) >= MAX_BEFORE_PRUNE:
+                del sent_items[:PRUNE_AMOUNT]
+
+    def save_sent_entries(self) -> None:
+        """saves the sent entries to the file json in the path attribute"""
+        try:
+            with open(file=self.path, mode="w") as file:
+                json.dump(self.sent_items, fp=file, indent=4)
+            self.logger.info(f"successfully saved to {self.config.sent_file}")
+        except IOError as e:
+            self.logger.error(
+                f"IOError occured when saving to {self.config.sent_file}: {e}"
+            )
+        except PermissionError as e:
+            self.logger.error(
+                f"PermissionError occured when saving to {self.config.sent_file}: {e}"
+            )
+
     async def send_batch(self, entries: list[Entry], feeds: list[Feed]) -> None:
         """send the batch of entries from the feed
 
@@ -180,5 +181,8 @@ class DiscordBot:
         )
         for webhook_url, entry_list in batches.items():
             payloads = self._process_entries(entry_list)
-            for payload in payloads:
-                await self._send_with_retry(webhook_url, payload)
+            for entry, payload in zip(entry_list, payloads):
+                response_status: int = await self._send_with_retry(webhook_url, payload)
+
+                if response_status < 300:
+                    self._add_sent_entry(entry)

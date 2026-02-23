@@ -15,6 +15,9 @@ async def main() -> None:
         entries: list[Entry] = feed_handler.fetch_feed_entries(feed)
         await bot.send_batch(entries, feeds)
 
+    bot.prune_sent_entries()
+    bot.save_sent_entries()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
