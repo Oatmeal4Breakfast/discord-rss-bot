@@ -29,8 +29,8 @@ type FeedData = dict[str, list[dict[str, str]]]
 
 
 class FeedHandler:
-    def __init__(self, config: Config) -> None:
-        self.feeds_file: Path = Path.cwd() / f"{config.feed_file}"
+    def __init__(self, feed_file: str) -> None:
+        self.feeds_file: Path = Path.cwd() / f"{feed_file}"
 
     def _load_feeds(self) -> FeedData:
         """Loads feeds from feed_file
@@ -97,15 +97,3 @@ class FeedHandler:
             )
             entries.append(new_entry)
         return entries
-
-
-if __name__ == "__main__":
-    from src.config import get_config
-    from dataclasses import asdict
-
-    config = get_config()
-    handler: FeedHandler = FeedHandler(config=config)
-    feeds: list[Feed] = handler.extract_feeds()
-    entries: list[Entry] = handler.fetch_feed_entries(feed=feeds[0])
-    print(asdict(entries[0]))
-    print(len(entries))

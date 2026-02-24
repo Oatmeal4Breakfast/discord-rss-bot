@@ -4,16 +4,16 @@ feeds:
   #------------------------------------------------------------------''
   - name: "TechCrunch"
     url: "https://techcrunch.com/feed/"
-    webhook: ""
+    webhook: "https://webhookurlhere.com/asdgfasd/fasdfa"
 
   - name: "Bleeping Computer"
     url: "https://www.bleepingcomputer.com/feed/"
-    webhook: ""
+    webhook: "https://webhookurlhere.com/asdgfasd/fasdfa"
 
   - name: "The Verge"
     url: "http://theverge.com/rss/index.html"
-    webhook: ""
+    webhook: "https://webhookurlhere.com/asdgfasd/fasdfa"
 
   - name: "The Medium - Engineering"
     url: "https://medium.com/feed/medium-eng"
-    webhook: ""
+    webhook: "https://webhookurlhere.com/asdgfasd/fasdfa"

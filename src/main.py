@@ -6,7 +6,7 @@ from src.config import get_config, Config
 
 async def main() -> None:
     config: Config = get_config()
-    feed_handler: FeedHandler = FeedHandler(config)
+    feed_handler: FeedHandler = FeedHandler(config.feed_file)
     bot: DiscordBot = DiscordBot(config)
 
     feeds: list[Feed] = feed_handler.extract_feeds()
