@@ -62,7 +62,7 @@ class DiscordBot:
         self.logger.info(f"parsing {entry.id}...")
         return self.parser.handle(data=entry.summary).strip()[:2048]
 
-    def _filter_entries(self, entries: list[Entry]):
+    def _filter_entries(self, entries: list[Entry]) -> list[Entry]:
         """check the entry id against the list of sent entries
 
         Args:
