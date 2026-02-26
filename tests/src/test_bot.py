@@ -148,3 +148,114 @@ class TestDiscordBot:
 
         assert result == 200
         assert mock_client.post.call_count == 1
+
+    def test_prune_sent_entries_under_threshold(self, bot) -> None:
+        bot.sent_items = {"FeedA": [f"id{i}" for i in range(50)]}
+
+        bot.prune_sent_entries()
+
+        assert len(bot.sent_items["FeedA"]) == 50
+
+    def test_prune_sent_entries_over_threshold(self, bot) -> None:
+        bot.sent_items = {"FeedA": [f"id{i}" for i in range(105)]}
+
+        bot.prune_sent_entries()
+
+        assert len(bot.sent_items["FeedA"]) == 95
+        assert bot.sent_items["FeedA"][0] == "id10"
+
+    def test_prune_sent_entries_multiple_feeds(self, bot) -> None:
+        bot.sent_items = {
+            "FeedA": [f"id{i}" for i in range(105)],
+            "FeedB": [f"id{i}" for i in range(30)],
+        }
+
+        bot.prune_sent_entries()
+
+        assert len(bot.sent_items["FeedA"]) == 95
+        assert len(bot.sent_items["FeedB"]) == 30
+
+    def test_save_sent_entries(self, bot) -> None:
+        bot.sent_items = {"TestFeed": ["id1", "id2"]}
+
+        bot.save_sent_entries()
+
+        with open(bot.path, "r") as f:
+            saved_data = json.load(f)
+
+        assert saved_data == {"TestFeed": ["id1", "id2"]}
+
+    def test_save_sent_entries_overwrites_existing(self, bot) -> None:
+        bot.save_sent_entries()
+
+        bot.sent_items = {"NewFeed": ["new_id"]}
+        bot.save_sent_entries()
+
+        with open(bot.path, "r") as f:
+            saved_data = json.load(f)
+
+        assert saved_data == {"NewFeed": ["new_id"]}
+        assert "TechCrunch" not in saved_data
+
+    @pytest.mark.asyncio
+    async def test_send_batch(self, bot, fake_entry, fake_feed) -> None:
+        success = MagicMock()
+        success.status_code = 200
+        success.text = "OK"
+
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=success)
+
+        with patch("src.bot.httpx.AsyncClient") as mock_async_client:
+            mock_async_client.return_value.__aenter__.return_value = mock_client
+
+            await bot.send_batch([fake_entry], [fake_feed])
+
+        assert fake_entry.id in bot.sent_items.get(fake_entry.feed, [])
+        assert mock_client.post.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_send_batch_skips_already_sent(self, bot, fake_feed) -> None:
+        already_sent = Entry(
+            id="id1",
+            feed="TechCrunch",
+            title="Old Article",
+            link="https://example.com/old",
+            summary="<p>old</p>",
+        )
+
+        success = MagicMock()
+        success.status_code = 200
+        success.text = "OK"
+
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=success)
+
+        tc_feed = Feed(
+            name="TechCrunch",
+            url="https://techcrunch.com",
+            webhook="https://webhook_url.com",
+        )
+
+        with patch("src.bot.httpx.AsyncClient") as mock_async_client:
+            mock_async_client.return_value.__aenter__.return_value = mock_client
+
+            await bot.send_batch([already_sent], [tc_feed])
+
+        assert mock_client.post.call_count == 0
+
+    @pytest.mark.asyncio
+    async def test_send_batch_does_not_add_on_failure(self, bot, fake_entry, fake_feed) -> None:
+        failure = MagicMock()
+        failure.status_code = 500
+        failure.text = "Internal Server Error"
+
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=failure)
+
+        with patch("src.bot.httpx.AsyncClient") as mock_async_client:
+            mock_async_client.return_value.__aenter__.return_value = mock_client
+
+            await bot.send_batch([fake_entry], [fake_feed])
+
+        assert fake_entry.feed not in bot.sent_items or fake_entry.id not in bot.sent_items.get(fake_entry.feed, [])
