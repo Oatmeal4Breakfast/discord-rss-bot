@@ -12,57 +12,21 @@ def sample_feed() -> Feed:
     return Feed(
         name="fake_feed",
         url="https://example.com/feed",
-        webhook="https://discord.webhool.url",
+        webhook="https://discord.webhook.url",
     )
-
-
-@pytest.fixture
-def sample_entry(sample_feed) -> Entry:
-    return Entry(
-        id="123",
-        feed=sample_feed.name,
-        title="Test Article",
-        link="https://link_to_entry.com",
-        summary="<p> example entry </p>",
-    )
-
-
-@pytest.fixture
-def sample_entries(sample_feed) -> list[Entry]:
-    return [
-        Entry(
-            id="1",
-            feed=sample_feed.name,
-            title="Test 1",
-            link="https://link_to_entry1.com",
-            summary="<p> test entry 1 </p>",
-        ),
-        Entry(
-            id="2",
-            feed=sample_feed.name,
-            title="Test 2",
-            link="https://link_to_entry1.com",
-            summary="<p> test entry 2 </p>",
-        ),
-        Entry(
-            id="3",
-            feed=sample_feed.name,
-            title="Test 3",
-            link="https://link_to_entry1.com",
-            summary="<p> test entry 3 </p>",
-        ),
-    ]
 
 
 @pytest.fixture
 def fake_feed_file(tmp_path) -> Path:
-    file_path = tmp_path / "feeds.yaml"
-    data: dict[str, dict[str, str]] = {
-        "feeds": {
-            "name": "fake_feed",
-            "url": "https://example.com/feed",
-            "webhook": "https://discord.webhool.url",
-        }
+    file_path: Path = tmp_path / "feeds.yaml"
+    data: dict[str, list[dict[str, str]]] = {
+        "feeds": [
+            {
+                "name": "fake_feed",
+                "url": "https://example.com/feed",
+                "webhook": "https://discord.webhook.url",
+            }
+        ]
     }
     file_path.write_text(yaml.dump(data))
     return file_path
@@ -91,6 +55,7 @@ class TestFeedHandler:
         assert len(data) > 0
         assert isinstance(data, list)
         assert isinstance(data[0], Feed)
+        assert data[0] == sample_feed
 
     def test_extract_feeds_fails(self, fake_handler) -> None:
         bad_file: str = "fake_file.yaml"
@@ -98,12 +63,27 @@ class TestFeedHandler:
         with pytest.raises(expected_exception=RuntimeError):
             bad_handler.extract_feeds()
 
-    def test_fetch_feed_entries(self, fake_handler) -> None:
-        fake_feed: list[Feed] = fake_handler.extract_feeds()[0]
+    @patch("src.feed_handler.feedparser.parse")
+    def test_fetch_feed_entries(self, mock_parse, sample_feed, fake_handler) -> None:
+        fake_feed_data = MagicMock()
+        fake_feed_data.bozo = False
+        fake_feed_data.entries = [
+            MagicMock(
+                id="123",
+                feed="fake_feed",
+                title="fake_entry",
+                link="https://example.com",
+                summary="<p> Hello </p>",
+            )
+        ]
 
-        entries: list[Entry] = fake_handler.fetch_feed_entries(feed=fake_feed)
+        mock_parse.return_value = fake_feed_data
 
-        assert entries
-        assert len(entries) <= 5
-        assert isinstance(entries, list)
-        assert isinstance(entries[0], Entry)
+        entries = fake_handler.fetch_feed_entries(sample_feed)
+
+        assert len(entries) == 1
+        assert entries[0].title == "fake_entry"
+
+        mock_parse.assert_called_once_with(
+            url_file_stream_or_string="https://example.com/feed"
+        )
