@@ -16,9 +16,9 @@ from src.logger import get_logger
 
 class DiscordBot:
     def __init__(self, config: Config) -> None:
-        self.config: Config = config
+        self.retry_count: int = config.retry_count
         self.parser: HTML2Text = HTML2Text()
-        self.path: Path = Path.cwd() / f"{config.sent_file}"
+        self.path: Path = Path(config.sent_file)
         self.logger = get_logger(__name__, config)
         self.sent_items: dict[str, list[str]] = self._load_sent_items()
 
@@ -32,7 +32,7 @@ class DiscordBot:
             dict[str,list[str]]
         """
         if not self.path.is_file():
-            self.logger.warning(f"file with name {self.config.sent_file} not found")
+            self.logger.warning(f"file with name {self.path} not found")
             return {}
 
         with open(file=self.path, mode="r") as file:
@@ -47,7 +47,7 @@ class DiscordBot:
         Returns:
             None
         """
-        self.logger.info(f"added {entry.feed} to {self.config.sent_file}.")
+        self.logger.info(f"added {entry.feed} to {self.path}.")
         return self.sent_items.setdefault(entry.feed, []).append(entry.id)
 
     def _parse_entry_summary(self, entry: Entry) -> str:
@@ -126,7 +126,7 @@ class DiscordBot:
         """
         retry_count: int = 0
         async with httpx.AsyncClient() as client:
-            while retry_count < self.config.retry_count:
+            while retry_count < self.retry_count:
                 response: httpx.Response = await client.post(
                     url=webhook_url, json={"embeds": [payload]}
                 )
@@ -156,14 +156,12 @@ class DiscordBot:
         try:
             with open(file=self.path, mode="w") as file:
                 json.dump(self.sent_items, fp=file, indent=4)
-            self.logger.info(f"successfully saved to {self.config.sent_file}")
+            self.logger.info(f"successfully saved to {self.path}")
         except IOError as e:
-            self.logger.error(
-                f"IOError occured when saving to {self.config.sent_file}: {e}"
-            )
+            self.logger.error(f"IOError occured when saving to {self.path}: {e}")
         except PermissionError as e:
             self.logger.error(
-                f"PermissionError occured when saving to {self.config.sent_file}: {e}"
+                f"PermissionError occured when saving to {self.path}: {e}"
             )
 
     async def send_batch(self, entries: list[Entry], feeds: list[Feed]) -> None:
