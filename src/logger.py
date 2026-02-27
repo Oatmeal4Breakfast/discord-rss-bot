@@ -6,6 +6,8 @@ from src.config import Config
 def get_logger(name: str, config: Config) -> logging.Logger:
     logger = logging.getLogger(name)
 
+    logger.setLevel(level=config.log_level)
+
     if logger.hasHandlers():
         return logger
 
