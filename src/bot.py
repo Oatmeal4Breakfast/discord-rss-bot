@@ -10,17 +10,16 @@ from src.feed_handler import Feed, Entry
 from src.logger import get_logger
 
 
-# TODO: Fix/Implement the adding and saving methods to the batch_send method
-# TODO: Complete the test suite
-
-
 class DiscordBot:
     def __init__(self, config: Config) -> None:
-        self.retry_count: int = config.retry_count
         self.parser: HTML2Text = HTML2Text()
         self.path: Path = Path(config.sent_file)
         self.logger = get_logger(__name__, config)
         self.sent_items: dict[str, list[str]] = self._load_sent_items()
+
+        if config.retry_count == 0:
+            self.retry_count: int = 3
+        self.retry_count: int = config.retry_count
 
     def _load_sent_items(self) -> dict[str, list[str]]:
         """Creates a sent_items.json to store sent entries
@@ -135,7 +134,7 @@ class DiscordBot:
                     self.logger.error(
                         f"Too many requests at once please wait {retry_after / 1000} seconds..."
                     )
-                    await asyncio.sleep(retry_after / 1000)
+                    await asyncio.sleep(int(retry_after) / 1000)
                 else:
                     break
                 retry_count += 1
