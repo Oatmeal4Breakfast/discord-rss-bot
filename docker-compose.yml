@@ -3,5 +3,6 @@ services:
   discord-bot:
     container_name: discord-bot
     build: .
+    user: "${UID}:${GID}"
     volumes:
       - ./data:/app/data
