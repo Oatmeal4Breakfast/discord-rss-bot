@@ -7,3 +7,5 @@ services:
     volumes:
       - ./data:/app/data
       - ./feeds.yaml:/app/feeds.yaml:ro
+    healthcheck:
+      disable: true
